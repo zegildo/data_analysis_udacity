@@ -1,30 +1,568 @@
----
-title: "Final_Project"
-author: "zegildo"
-date: "24/07/2020"
-output: html_document
----
+Wines Exploration by José Gildo
+========================================================
+This work aims to compare red and white wines datasets. Both datasets are available on the dataset options [here](https://docs.google.com/document/d/e/2PACX-1vRmVtjQrgEPfE3VoiOrdeZ7vLPO_p3KRdb_o-z6E_YJ65tDOiXkwsDpLFKI3lUxbD6UlYtQHXvwiZKx/pub?embedded=true) for this project.
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+There main question that we will try to answer is:
+
+- Which are the chemical properties has the biggest relationship with quality?
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+# This code helps me to remove output from lappy witch is not possible 
+# using echo, message, and warninig setting with FALSE tag.
+def <- knitr::knit_hooks$get("output")
+knitr::knit_hooks$set(output = function(x, options) {
+  x <- def(x, options)
+  ifelse(!is.null(options$suppress), gsub(pattern = "```.*```", "", x), x)
+})
 ```
 
-## R Markdown
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+#read files
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+setwd('~/Cursos/R/estudos/scripts/final_project/data')
+red_wines <- read.csv(file = 'wineQualityReds.csv')
+white_wines <- read.csv(file = 'wineQualityWhites.csv')
 
-```{r cars}
-summary(cars)
 ```
 
-## Including Plots
+This report explores a dataset of red and white wines about many perspectives. Red wines dataset has information about 1,599 wines. White wines dataset has information about 4,898 wines. Both databases have 6,497 lines and 13 variables. 
 
-You can also embed plots, for example:
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+list.of.packages <- c("ggplot2", "fmsb", "psych")
+
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+
+if(length(new.packages)) install.packages(new.packages)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+# Univariate Plots Section
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# function to summary data
+summary_data <- function(data_base){
+  dim(red_wines)
+  summary(red_wines)
+}
+```
+
+**Red Wines:**
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+summary_data(red_wines)
+```
+
+**White Wines:**
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+summary_data(white_wines)
+```
+
+**Compare both classes of wine for each attributes:**
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(tidyverse)
+
+#merge red and white wines in a single dataset
+red_wines$class <- 'RED'
+white_wines$class <- 'WHITE'
+all_wines <- rbind(red_wines, white_wines)
+all_wines$X <- NULL
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+histogram <- function(variable){
+  ggplot(data=all_wines, aes_string(x=variable,fill="class")) + 
+  geom_histogram()+
+  labs(title= paste("Histogram of ",variable)) +
+  labs(x=variable, y="count")
+}
+```
+
+**Histogram over all variables on the database:**
+
+```{r echo = FALSE, message=FALSE, warning=FALSE, suppress = T}
+# The histogram of all variables
+columns <- head(colnames(all_wines), -1)
+lapply(columns, histogram)
+```
+
+
+**Red and White wines over all attributes in median values:**
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(fmsb)
+radar_max_min <- rbind(
+                    all_wines %>% summarise_if(is.numeric, max), 
+                    all_wines %>% summarise_if(is.numeric, min)
+                    )
+#red white wines
+red_white_wines <- all_wines %>% 
+                   group_by(class) %>% 
+                   summarise_if(is.numeric, median)
+
+red_white_wines$class <- NULL
+attr(red_white_wines, "row.names") <- c('Red Wines', 'White Wines')
+
+radar_data <- rbind(radar_max_min, red_white_wines)
+
+# Color vector
+colors_border <- c(rgb(0.8,0.2,0.5,0.9),
+                   rgb(0.7,0.5,0.1,0.9)
+                   )
+colors_in <- c(rgb(0.8,0.2,0.5,0.4),
+               rgb(0.7,0.5,0.1,0.4) 
+               )
+
+# plot with default options:
+radarchart(radar_data, 
+           axistype=1, 
+          
+           #custom polygon
+           pcol=colors_border, 
+           pfcol=colors_in, 
+           plwd=4, 
+           plty=1,
+           
+           #grid
+           cglcol="grey", 
+           cglty=1, 
+           axislabcol="grey",
+    
+           #custom labels
+           vlcex=1 
+          )
+
+# Add a legend
+legend(x=1, 
+       y=1, 
+       legend = rownames(radar_data[-c(1,2),]), 
+       bty = "n", 
+       pch=20 , 
+       col=colors_in , 
+       text.col = "grey", 
+       cex=1, 
+       pt.cex=3)
+
+```
+
+**Best and Worse Red Wines comparation:**
+
+```{r echo=FALSE, radar_function}
+
+radar_function <- function(data_base, 
+                           legenda_best, 
+                           legenda_worse,
+                           colors_border,
+                           colors_in){
+  red_wine_max_min <- rbind(
+                    data_base %>% summarise_if(is.numeric, max), 
+                    data_base %>% summarise_if(is.numeric, min)
+                    )
+  best_red_wines <- filter(data_base, quality == max(quality))%>%                    summarise_if(is.numeric, median)
+  attr(best_red_wines, "row.names") <- c(legenda_best)
+  
+  worse_red_wines <- filter(red_wines, quality == min(quality))%>%                    summarise_if(is.numeric, median)
+  attr(worse_red_wines, "row.names") <- c(legenda_worse)
+  
+  red_wines_best_worst <- rbind(red_wine_max_min,
+                              best_red_wines,
+                              worse_red_wines)
+  
+  # plot with default options:
+  red_wines_best_worst$X <- NULL
+  radarchart(red_wines_best_worst, 
+             axistype=1, 
+            
+             #custom polygon
+             pcol=colors_border, 
+             pfcol=colors_in, 
+             plwd=4, 
+             plty=1,
+             
+             #grid
+             cglcol="grey", 
+             cglty=1, 
+             axislabcol="grey",
+      
+             #custom labels
+             vlcex=1 
+            )
+
+  # Add a legend
+  legend(x=1, 
+         y=1, 
+         legend = rownames(red_wines_best_worst[-c(1,2),]), 
+         bty = "n", 
+         pch=20 , 
+         col=colors_in , 
+         text.col = "grey", 
+         cex=1, 
+         pt.cex=3)
+  
+}
+
+
+```
+
+```{r echo=FALSE, red_wines_extreme_comparation}
+# Color vector
+colors_border <- c(rgb(0.8,0.2,0.5,0.9),
+                   rgb(0.3,0.3,0.3,0.9)
+                   )
+colors_in <- c(rgb(0.8,0.2,0.5,0.4),
+               rgb(0.3,0.3,0.3,0.4) 
+               )
+
+radar_function(red_wines, 
+               'Best Red Wine', 
+               'Worst Red Wine', 
+               colors_border, 
+               colors_in)
+```
+
+
+**Best and Worse White Wines comparation:**
+
+```{r echo=FALSE, white_wines_extreme_comparation}
+
+# Color vector
+colors_border <- c(rgb(0.7,0.5,0.1,0.9),
+                   rgb(0.3,0.3,0.3,0.9)
+                   )
+colors_in <- c(rgb(0.7,0.5,0.1,0.4),
+               rgb(0.3,0.3,0.3,0.4) 
+               )
+
+radar_function(white_wines, 
+               'Best White Wine', 
+               'Worst White Wine', 
+               colors_border, 
+               colors_in)
+```
+
+
+# Univariate Analysis
+
+### What is the structure of your dataset?
+
+Red wines dataset has information about 1599 wines. White wines dataset has information about 4898 wines. Both databases have 6,497 lines and 13 variables. 
+
+### What is/are the main feature(s) of interest in your dataset?
+
+The main feature in the data set is **quality**. We would like to determine which are best and minimal combination of features for determine the quality of a wine.
+
+
+### What other features in the dataset do you think will help support your investigation into your feature(s) of interest?
+
+Others features that will help our analysis for both wines: _age of wines_, _kind of grapes_, _price of the botter_, _region of wine_, _is a blend or not_. For Red Wines we have visible differences when we compare hight and low quality wines. It is possible notice that _alcohol_, _citric.acid_ and _volatile.acidity_ are (apparently) inversely proportional. However, white wines have a remarkable difference in _alcohol_ attribute and subtle differences in _pH_ and _density_. 
+
+
+### Did you create any new variables from existing variables in the dataset?
+
+No. I created a new dataset joining red and white wines datasets.
+
+### Of the features you investigated, were there any unusual distributions?
+
+It was necessary to adjust the dataset to make them tailored to use libraries to build the presented graphs.
+
+**Some observations:**
+
+- **Alcohol:** In general, both wines (red and white) have the same distribution of alcoholic graduation but red wines have more alcohol than white wines. An interesting point is that we found white wines with 14% of alcohol concentration and red wines with 8% of alcohol concentration; 
+
+- **pH:** In general, red wines have a _pH_ bigger than white wines. At this point we must to do two considerations: **1)** _pH_ is a logarithm scale and does it mean that the small differences in this scale represents differences in fact of **10x**; **2)** When *ph* values are small it means an acid environment. Otherwise, when *ph* is increasing we have an alkaline environment. We can observe that *ph* and *citric acid* are inversely proportional and this is confirmed in our dataset. White wines are more acid and red wines are more alcoholic;
+
+**Acidity:**
+
+- **Citric Acid:** In general, white wines are more citric than red wines and it is natural due to the grapes used in the process;
+
+- **Volatile Acidity:** In geral, red wines have more volatile acidity than white wines;
+
+- **Fixed Acidity:** In general, red wines have more fixed acidity than white wines;
+
+- **Chlorides:** In general, red wines have more chlorides than white wines probably relate to the physical-chemical production process. For both wines are many variability about this attribute;
+
+- **Density:** In general, red wines have more density than white wines. Density is an important factor to harmonize with fat because of that it is common to serve red wine with fatty meats. This is an expected result. White wines are refreshing and much density is not interesting for this propouse; 
+
+**- Sulphates:** In general, red wines have more sulphates than white wines, but for both wines are a low variability for this variable. 
+
+**Sulfur:**
+
+**- Total and Free Sulfur Dioxide:** Based in Sulfur Dioxide is used to prevent oxidation and microbial growth. However, an excessive amounts of SO2 can inhibit fermentation and cause undesirable sensory effects.
+
+ **- Residual Sugar:** In general, red wines have next to nothing residual sugar. White wines have more variability and more residual sugar than red wines. The distribution of this variability seems to be skewed;
+
+ **- Quality:** Even with different combinations of attributes, both wines arrives similar quality. 
+
+
+> **Conclusions**:
+
+- White wines are more acid and red wines are more alcoholic;
+- White wines have acidity attributes more homogeneous than red wines;
+- When we compare all wines we can notice differences to three variables: _volatile acid_, _ph_ and _total sulfur dioxide_. If we consider only the quality in **red wines** it is possible notice that _alcohol_, _citric.acid_ and _volatile.acidity_ are (apparently) inversely proportional. However, for **white wines** we have a remarkable difference in _alcohol_ attribute and subtle differences in _pH_ and _density_;
+- It is possible that the red wines with elevate values to sulphates attribute can be related with preserve techniques to artificial wines production.
+
+# Bivariate Plots Section
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Bivariate_Plots}
+library(psych)
+pairs.panels(all_wines, bg=c("yellow","blue"), pch=21, stars=TRUE)
+
+```
+
+There are many interesting things this graph shows to us:
+
+* The variables most related with _quality_ are: alcohol, density and volatile acid. Indeed, everyone who drinks wine knows that these three variables sum up the main properties of a wine. This observation shows consistency between the data and common sense;
+* These considerations are considering all wines (white and red).
+
+**All Wines:**
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, suppress=TRUE}
+# We are writing a function to compare quality from other variables
+
+dot_quality <- function(variable, data_base, color){
+  
+  if(color == "class"){
+    ggplot(data=data_base,aes_string(x=variable,y="quality", color=color))+
+    geom_point(alpha=1/4)+
+    labs(x=variable, y="quality",title= paste(variable," vs quality"))
+    
+  }else{
+    ggplot(data=data_base,aes_string(x=variable,y="quality"))+
+    geom_point(alpha=1/4, color=color)+
+    labs(x=variable, y="quality",title= paste(variable," vs quality"))
+  }
+}
+```
+
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, suppress=TRUE}
+# The histogram of all variables about bivariate analysis
+# columns was already defined on the univariate section
+columns <- head(colnames(all_wines), -2)
+lapply(columns, dot_quality, data_base=all_wines, color="class")
+```
+
+
+
+**Red Wines:**
+We are interested in understanding the behavior of quality over other variables considering just red wines.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, suppress=TRUE}
+lapply(columns, dot_quality, data_base=red_wines, color="red")
+```
+
+
+
+**White Wines:**
+
+Now we are interested in understanding the behavior of quality over other variables considering just white wines.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, suppress=TRUE}
+#white_wines$class <- 'yellow3'
+lapply(columns, dot_quality, data_base=white_wines, color="yellow3")
+
+```
+
+### Plot One
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+boxplot_wines <- function(data_base, title){
+  data_base$X <- NULL
+  best_wines <- filter(data_base, quality == max(quality))
+  best_wines$class <- "BEST"
+  worse_wines <- filter(data_base, quality == min(quality))
+  worse_wines$class <- "WORSE"
+  
+  white_in_extreme <-rbind(best_wines, worse_wines)
+  
+  white_in_extreme %>% 
+  pivot_longer(-class) %>%
+  ggplot(aes(x=value, y=class, col=class)) +
+  geom_boxplot() +
+  facet_wrap(~name, scales = "free_x") +
+  labs(title=title, x="Variables", y="classes", color = "Legend")
+}
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+boxplot_wines(red_wines, "Red Wines Comparison")
+boxplot_wines(white_wines, "White Wines Comparison")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+boxplot_func <- function (data_base, variable){
+  ggplot(data_base, aes_string(x = 'quality_factor', y = variable)) +
+  geom_boxplot() +
+  labs(title = paste("Quality vs", variable), x ='quality_factor' , y = variable )
+}
+
+lapply(columns, boxplot_func, data_base=all_wines)
+```
+
+## Conclusions
+
+**All Wines**
+The differences between best and worst wines are subtle for both types of wines (red and white). The data guide us to understand that more alcohol and citric acid associate with less density and chlorides is related to max quality in both types of wine. This evidence agree with the oenology theory when good wines has a good balance between alcohol, density and citric acid. Maybe chlorides and sulphates are substances added to process to get the balance of the wine.  
+
+**Red Wines**
+If we observe just red wines, maximum _quality_ it is obtained when:
+
+* **Alcohol** > 10 (in the most of the cases);
+* **Density** < 1;
+* **Fixed Acid** < 13;
+* Low **volatility** > 0.2 < 0.9;
+* If we analyze _Free Sulfur Dioxide, Total Sulfur, Fixed Sulfur_ and _Residual Sugar_ best and worst quality have similar proportions of these elements and it is unlikely these variables can determine quality in red wines. At the same time, we found maximum quality with _ph_ lower than 3 and upper 3.5. Perhaps, _ph_ be the result of the combination of other variables and not necessarily a determining variable.
+
+**Best**
+Best Red Wines has more alcohol, more citric acid, more sulphates, less ph, less density and chlorides. These attributes show the contrast between best and worse red wines.
+
+**White Wines**
+If we observe just red wines, maximum _quality_ it is obtained when:
+
+* The variables are more defined than red wines;
+* **Alcohol** > 10 < 13;
+* **Ph** > 3.15 < 3.5
+* **Volatility**  > 0.2 < 0.4
+* **Fixed Acid** > 6 < 9
+* **Chlorides** < 0.05
+* **Density** > 0.9 < 1
+* **Sulphates** > 0.3 < 0.7
+
+**Best**
+Best white Wines has more alcohol, more citric acid, more sulphates, less density and chlorides when compared with worse wines. However, more ph while best red wines has less ph when we compare best and worse wines. 
+
+**General Conclusions**
+* For both types of wines the variables more related with quality are: alcohol, density and citric acid. This evidence agree with the oenology theory when good wines has a good balance between alcohol, density and citric acid;
+
+* Best red wines are more diverse. It is possible to find best red wines with different values of variables. Maybe, different grapes, or blend, or recipes even with less alcohol, and more density, red wines show to us that max quality is possible to archive with many ways. However, max quality in white wines are much more specific. This characteristic suggest to us that max quality in white wines follow a patron like a recipe. There is small margins and variability between variables in max quality and worse quality.
+
+**Outliers Analysis:**
+There is a white wine with max quality and a small percentage of alcohol. This is an interesting outlier to be analyzed. It is possible to realize that on this particular case the small percentage of alcohol was associated with higher values to residual sugar, fixed acidity and density. Maybe to give to this exemplar the balance needed.
+
+
+# Multivariate Plots Section
+
+> **Tip**: Now it's time to put everything together. Based on what you found in
+the bivariate plots section, create a few multivariate plots to investigate
+more complex interactions between variables. Make sure that the plots that you
+create here are justified by the plots you explored in the previous section. If
+you plan on creating any mathematical models, this is the section where you
+will do that.
+
+```{r echo=FALSE, Multivariate_Plots}
+
+```
+
+# Multivariate Analysis
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# plot multivariate data for our analysis
+
+
+multi_variate_fun <- function(data_base, x, y, color, title){
+  
+  ggplot(data_base, aes_string(x = x, 
+                     y = y, 
+                     col = color
+                     )) +
+  geom_point(alpha = .3) +
+  scale_color_brewer(palette = "Spectral") +
+  labs(title = title)
+}
+
+#adjust all values in scale before plots to evidence tendences on the same range
+# change scale give us the same graph...
+#all_wines$stand_alcohol <- scale(all_wines$alcohol)
+
+all_wines$quality_factor <- factor(all_wines$quality)
+red_wines$quality_factor <- factor(red_wines$quality)
+white_wines$quality_factor <- factor(white_wines$quality)
+
+multi_variate_fun(all_wines, 'alcohol', 'density', 'quality_factor', "All Wines")
+multi_variate_fun(red_wines, 'alcohol', 'density', 'quality_factor', "Red Wines")
+multi_variate_fun(white_wines, 'alcohol', 'density', 'quality_factor', "White Wines")
+
+multi_variate_fun(all_wines, 'alcohol', 'volatile.acidity', 'quality_factor', "All Wines")
+multi_variate_fun(red_wines, 'alcohol', 'volatile.acidity', 'quality_factor', "Red Wines")
+multi_variate_fun(white_wines, 'alcohol', 'volatile.acidity', 'quality_factor', "White Wines")
+# Criar com chloreto  
+multi_variate_fun(all_wines, 'volatile.acidity','density', 'quality_factor', "All Wines")
+multi_variate_fun(red_wines, 'volatile.acidity', 'density', 'quality_factor', "Red Wines")
+multi_variate_fun(white_wines, 'volatile.acidity', 'density', 'quality_factor', "White Wines")
+
+```
+```{r echo=FALSE, Multivariate_Plots}
+# Antes de qualquer coisa enviar para o github e ficar atualziando o arquivo correto
+# Criar o modelo apenas com alcol e densidade e verificar a relacao com a qualidade
+# Ja finalizar o projeto e enviar
+
+#all_wines$geom_mean <- sqrt( * )
+
+ggplot(all_wines, aes(x = quality, 
+                     y = scale(alcohol)/scale(density), 
+                     col = quality_factor
+                     )) +
+  geom_boxplot() +
+  labs(title = 'test')
+```
+### Talk about some of the relationships you observed in this part of the \
+investigation. Were there features that strengthened each other in terms of \
+looking at your feature(s) of interest?
+
+### Were there any interesting or surprising interactions between features?
+
+### OPTIONAL: Did you create any models with your dataset? Discuss the \
+strengths and limitations of your model.
+
+------
+
+# Final Plots and Summary
+
+> **Tip**: You've done a lot of exploration and have built up an understanding
+of the structure of and relationships between the variables in your dataset.
+Here, you will select three plots from all of your previous exploration to
+present here as a summary of some of your most interesting findings. Make sure
+that you have refined your selected plots for good titling, axis labels (with
+units), and good aesthetic choices (e.g. color, transparency). After each plot,
+make sure you justify why you chose each plot by describing what it shows.
+
+### Plot One
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+all_wines %>% 
+  pivot_longer(-class) %>%
+  ggplot(aes(x=value, y=class, col=class)) +
+  geom_boxplot() +
+  facet_wrap(~name, scales = "free_x") +
+  labs(x="Variables", y="classes", color = "Legend")
+```
+
+### Description One
+
+
+### Plot Two
+```{r echo=FALSE, Plot_Two}
+
+```
+
+### Description Two
+
+
+### Plot Three
+```{r echo=FALSE, Plot_Three}
+
+```
+
+### Description Three
+
+------
+
+# Reflection
+
+Maybe we need more information about the wines, like year of production, grapes used to production, local of production (_terroir_) and other variables related to taste. We know that alcohol is able o explain about 45% of quality variable. Maybe join alcohol with other variables we can determine quality as so a avaliator.
