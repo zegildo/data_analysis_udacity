@@ -369,7 +369,6 @@ lapply(columns, dot_quality, data_base=white_wines, color="yellow3")
 
 ```
 
-### Plot One
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 
 boxplot_wines <- function(data_base, title){
@@ -395,7 +394,11 @@ boxplot_wines(red_wines, "Red Wines Comparison")
 boxplot_wines(white_wines, "White Wines Comparison")
 ```
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE, suppress = T }
+all_wines$quality_factor <- factor(all_wines$quality)
+red_wines$quality_factor <- factor(red_wines$quality)
+white_wines$quality_factor <- factor(white_wines$quality)
+
 boxplot_func <- function (data_base, variable){
   ggplot(data_base, aes_string(x = 'quality_factor', y = variable)) +
   geom_boxplot() +
@@ -448,20 +451,6 @@ There is a white wine with max quality and a small percentage of alcohol. This i
 
 # Multivariate Plots Section
 
-> **Tip**: Now it's time to put everything together. Based on what you found in
-the bivariate plots section, create a few multivariate plots to investigate
-more complex interactions between variables. Make sure that the plots that you
-create here are justified by the plots you explored in the previous section. If
-you plan on creating any mathematical models, this is the section where you
-will do that.
-
-```{r echo=FALSE, Multivariate_Plots}
-
-```
-
-# Multivariate Analysis
-
-
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 # plot multivariate data for our analysis
 
@@ -481,10 +470,6 @@ multi_variate_fun <- function(data_base, x, y, color, title){
 # change scale give us the same graph...
 #all_wines$stand_alcohol <- scale(all_wines$alcohol)
 
-all_wines$quality_factor <- factor(all_wines$quality)
-red_wines$quality_factor <- factor(red_wines$quality)
-white_wines$quality_factor <- factor(white_wines$quality)
-
 multi_variate_fun(all_wines, 'alcohol', 'density', 'quality_factor', "All Wines")
 multi_variate_fun(red_wines, 'alcohol', 'density', 'quality_factor', "Red Wines")
 multi_variate_fun(white_wines, 'alcohol', 'density', 'quality_factor', "White Wines")
@@ -498,71 +483,101 @@ multi_variate_fun(red_wines, 'volatile.acidity', 'density', 'quality_factor', "R
 multi_variate_fun(white_wines, 'volatile.acidity', 'density', 'quality_factor', "White Wines")
 
 ```
-```{r echo=FALSE, Multivariate_Plots}
-# Antes de qualquer coisa enviar para o github e ficar atualziando o arquivo correto
-# Criar o modelo apenas com alcol e densidade e verificar a relacao com a qualidade
-# Ja finalizar o projeto e enviar
 
-#all_wines$geom_mean <- sqrt( * )
 
-ggplot(all_wines, aes(x = quality, 
-                     y = scale(alcohol)/scale(density), 
-                     col = quality_factor
-                     )) +
-  geom_boxplot() +
-  labs(title = 'test')
+
+
+
+```{r echo=FALSE, Correlation_Plots}
+#The correlations between quality, some variables and a first model
+
+correlacoes <- all_wines %>%
+select(quality, alcohol, density, citric.acid, pH, volatile.acidity) %>%
+mutate(geom_alcohol_density = sqrt(alcohol * density)) %>%
+mutate(geom_alcohol_density_acid = (alcohol * density * citric.acid)^(1/3)) %>%
+mutate(alcohol_div_density = (alcohol / density)) %>%
+pivot_longer(-quality, names_to = "variavel") %>%
+group_by(variavel) %>%
+summarise(cor = cor(quality, value))
+
+
+ggplot(correlacoes, aes(fct_reorder(variavel, cor), cor)) +
+  geom_segment(aes(xend = fct_reorder(variavel, cor), yend = 0),
+               col = "lightgray", size = 2) +
+  geom_point(size = 5, col = "navyblue") +
+  lims(y = c(0, NA)) +
+  labs(x = "Variável", y = "Correlação") +
+  coord_flip() +
+  theme_classic()
+
 ```
+
+
+
+
+# Multivariate Analysis
+
+
 ### Talk about some of the relationships you observed in this part of the \
 investigation. Were there features that strengthened each other in terms of \
 looking at your feature(s) of interest?
 
+Observing bivariate analysis is it possible to see the relation between alcohol, density and acidity with quality. The hypothesis was quality was a result of balance between alcohol, density and acidity. If true, the other variables are a byproduct of winemaking as important to quality as the label. Therefore, we can describe a model to measure quality as a model to measure balance between alcohol, density and acidity. Obviously it seemed a simplification of reality. We would be summarizing the ability to measure the quality of a wine to test the power of quantity of just 3 elements of the recipe. This would eliminate all the creativity of escaping the obvious and achieving excellence by purposefully highlighting some element. This would also force the qualification of good, those specimens that would fit in a proportion. Even so, we believe that for most examples this simplification of reality would be enough. After all, not every wine is exotic.
+
+
+
 ### Were there any interesting or surprising interactions between features?
+Yes. It is possible describe two interesting facts. 1) Alcohol variable is the most related with quality. And it is valid for all wines (red and white). 2) Alcohol by itself is able to explain quality about 45%.
 
 ### OPTIONAL: Did you create any models with your dataset? Discuss the \
 strengths and limitations of your model.
+
+At this point we can see alcohol and density related with quality for all wines, but not acidity. We also tried to relate acidity variables with alcohol and density but without success. After that, we tried do build a function that relate alcohol and density to explain quality. We build three models to explain quality: 
+
+
+1) Geometric mean between alcohol and density;
+
+$$
+f(a,d) = \sqrt{a . d}
+$$
+
+2) Geometric mean between alcohol, density and citric acid;
+
+$$
+f(a,d,c) = \sqrt[3]{a . d . c}
+$$
+
+3) Proportion between alcohol and density;
+
+$$
+f(a,d) = \frac{a}{d}
+$$
+
+
+The first model understand quality as a balance between alcohol and density. The second model understand quality as balance between alcohol, density and acidity (what is very related on the reality). Third model understand quality as a proportion between alcohol and density. We check the correlation results with quality values to measure the ability of each model do explain the quality variable. It is possible to see that alcohol variable by itself explain ~ 45% of quality. When we join alcohol with other variables also related with quality on the bivariate analysis we can't improve the correlation between the model and the quality variable.
+
 
 ------
 
 # Final Plots and Summary
 
-> **Tip**: You've done a lot of exploration and have built up an understanding
-of the structure of and relationships between the variables in your dataset.
-Here, you will select three plots from all of your previous exploration to
-present here as a summary of some of your most interesting findings. Make sure
-that you have refined your selected plots for good titling, axis labels (with
-units), and good aesthetic choices (e.g. color, transparency). After each plot,
-make sure you justify why you chose each plot by describing what it shows.
 
-### Plot One
-```{r echo=FALSE, message=FALSE, warning=FALSE}
-all_wines %>% 
-  pivot_longer(-class) %>%
-  ggplot(aes(x=value, y=class, col=class)) +
-  geom_boxplot() +
-  facet_wrap(~name, scales = "free_x") +
-  labs(x="Variables", y="classes", color = "Legend")
+```{r echo=FALSE, Multivariate_Plots}
+library(GGally)
+ggpairs(all_wines,
+        columns = c("alcohol", "density", "pH", "citric.acid", "quality"), 
+        lower = list(continuous = "smooth"))
 ```
 
-### Description One
-
-
-### Plot Two
-```{r echo=FALSE, Plot_Two}
-
+```{r echo=FALSE, Multivarite_plot_2}
+multi_variate_fun(all_wines, 'alcohol', 'density', 'quality_factor', "All Wines")
 ```
-
-### Description Two
-
-
-### Plot Three
-```{r echo=FALSE, Plot_Three}
-
-```
-
-### Description Three
-
-------
 
 # Reflection
 
-Maybe we need more information about the wines, like year of production, grapes used to production, local of production (_terroir_) and other variables related to taste. We know that alcohol is able o explain about 45% of quality variable. Maybe join alcohol with other variables we can determine quality as so a avaliator.
+This work aims to compare red and white wines datasets. This report explores a dataset of red and white wines about many perspectives. Red wines dataset has information about 1,599 wines. White wines dataset has information about 4,898 wines. Both databases have 6,497 lines and 13 variables. We join both datasets and work to understand quality based on the variables. We built three models to derive quality based on variables.
+
+We observed that alcohol is able to explain about 45% of quality variable for both wines (red and white). Maybe join alcohol with other variables we can determine quality. We tried join alcohol with other variables with good correlation with quality but we can't improve the rate of explanation. 
+
+At this point new hypothesis show to us: Maybe we need more information about the wines, like year of production, grapes used to production, local of production (_terroir_) and other variables related to taste. 
+
