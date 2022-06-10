@@ -670,7 +670,7 @@ Yes. It is possible describe two interesting facts.
 And it is valid for all wines (red and white). 
 2) Alcohol by itself is able to explain quality about 45%.
 
-### OPTIONAL: Did you create any models with your dataset? Discuss the \
+### OPTIONAL: Did you create any models with your dataset? Discuss the 
 ### strengths and limitations of your model.
 
 At this point we can see _alcohol_ and _density_ related with quality for all 
